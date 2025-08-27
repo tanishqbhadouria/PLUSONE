@@ -1,0 +1,15 @@
+{
+  "name": "jest-jasmine2-poc",
+  "version": "1.0.0",
+  "description": "POC for running AngularJS Jasmine tests with the Jest runner via jest-jasmine2",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "angular": "~1.8.2",
+    "angular-mocks": "~1.8.2",
+    "jest": "^29.0.0",
+    "jest-environment-jsdom": "^29.0.0",
+    "jest-jasmine2": "^29.0.0"
+  }
+}
