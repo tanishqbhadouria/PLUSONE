@@ -900,7 +900,244 @@ echo "✅ Migration completed! Run 'npm test' to verify."
 | userManagementController.spec.js | 17 | ✅ |
 | dashboardController.spec.js | 21 | ✅ |
 | integration.spec.js | 7 | ✅ |
-| **Total** | **117** | **✅** |
+| **Total** | **117** | **✅ |
+
+## 🗂️ **Static File Handling: Karma vs Jest**
+
+> **Replacing Karma's file serving patterns with Jest approaches**
+
+### **📁 Karma Static File Pattern (Before)**
+
+```javascript
+// karma.conf.js
+module.exports = function(config) {
+  config.set({
+    files: [
+      'src/**/*.js',
+      'test/**/*.spec.js',
+      // Static files served but not included
+      { pattern: 'assets/**/*.json', watched: false, included: false, served: true },
+      { pattern: 'templates/**/*.html', watched: false, included: false, served: true },
+      { pattern: 'images/**/*', watched: false, included: false, served: true }
+    ],
+    proxies: {
+      '/assets/': '/base/assets/',
+      '/templates/': '/base/templates/'
+    }
+  });
+};
+```
+
+### **🚀 Jest Static File Strategies**
+
+#### **1. Direct File Loading (Recommended for AngularJS)**
+
+```javascript
+// jest.setup.js additions
+const fs = require('fs');
+const path = require('path');
+
+// Template loading helper
+global.loadTemplate = function(templatePath) {
+  const fullPath = path.join(__dirname, 'templates', templatePath);
+  if (fs.existsSync(fullPath)) {
+    return fs.readFileSync(fullPath, 'utf8');
+  }
+  throw new Error(`Template not found: ${templatePath}`);
+};
+
+// Test data loading helper
+global.loadTestData = function(dataPath) {
+  const fullPath = path.join(__dirname, 'test-data', dataPath);
+  if (fs.existsSync(fullPath)) {
+    return JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+  }
+  throw new Error(`Test data not found: ${dataPath}`);
+};
+
+// Auto-populate AngularJS $templateCache
+angular.module('myApp').run(['$templateCache', function($templateCache) {
+  const templatesDir = path.join(__dirname, 'templates');
+  if (fs.existsSync(templatesDir)) {
+    fs.readdirSync(templatesDir).forEach(file => {
+      if (file.endsWith('.html')) {
+        const content = fs.readFileSync(path.join(templatesDir, file), 'utf8');
+        $templateCache.put(`/templates/${file}`, content);
+      }
+    });
+  }
+}]);
+```
+
+#### **2. Mock Static Assets**
+
+```javascript
+// jest.config.js
+module.exports = {
+  testRunner: 'jest-jasmine2',
+  testEnvironment: 'jsdom',
+  moduleNameMapper: {
+    // Mock CSS/SCSS files
+    '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+    
+    // Mock image files
+    '\\.(jpg|jpeg|png|gif|svg)$': '<rootDir>/__mocks__/fileMock.js',
+    
+    // Mock JSON data files
+    '\\.(json)$': '<rootDir>/__mocks__/jsonMock.js'
+  }
+};
+```
+
+```javascript
+// __mocks__/fileMock.js
+module.exports = 'test-file-stub';
+
+// __mocks__/jsonMock.js
+module.exports = {};
+```
+
+#### **3. Express Static Server (Most Karma-like)**
+
+```javascript
+// jest.global-setup.js
+const express = require('express');
+const path = require('path');
+
+module.exports = async function() {
+  const app = express();
+  
+  // Serve static files like Karma
+  app.use('/assets', express.static(path.join(__dirname, 'assets')));
+  app.use('/templates', express.static(path.join(__dirname, 'templates')));
+  
+  const server = app.listen(3001);
+  global.__STATIC_SERVER__ = server;
+};
+
+// jest.global-teardown.js
+module.exports = async function() {
+  if (global.__STATIC_SERVER__) {
+    await new Promise((resolve) => {
+      global.__STATIC_SERVER__.close(resolve);
+    });
+  }
+};
+```
+
+### **📂 Practical Usage Examples**
+
+#### **Template Integration Testing**
+```javascript
+describe('Template Loading', function() {
+  let $compile, $scope, $templateCache;
+
+  beforeEach(angular.mock.module('myApp'));
+  
+  beforeEach(angular.mock.inject(function(_$compile_, $rootScope, _$templateCache_) {
+    $compile = _$compile_;
+    $scope = $rootScope.$new();
+    $templateCache = _$templateCache_;
+  }));
+
+  it('should load and compile user template', function() {
+    // Template automatically loaded into $templateCache
+    const element = $compile('<div ng-include="\'/templates/user.html\'"></div>')($scope);
+    
+    $scope.user = { name: 'Test User' };
+    $scope.$digest();
+    
+    expect(element.html()).toContain('Test User');
+  });
+
+  it('should load template manually', function() {
+    const template = loadTemplate('user-card.html');
+    expect(template).toContain('<div class="user-card">');
+    
+    // Use in directive testing
+    $templateCache.put('/templates/user-card.html', template);
+  });
+});
+```
+
+#### **JSON Data Testing**
+```javascript
+// test-data/users.json
+[
+  {"id": 1, "name": "John Doe", "role": "admin"},
+  {"id": 2, "name": "Jane Smith", "role": "user"}
+]
+
+describe('Data Integration', function() {
+  it('should process test data', function() {
+    const testUsers = loadTestData('users.json');
+    
+    spyOn(UserService, 'getAllUsers').and.returnValue($q.resolve(testUsers));
+    
+    const controller = $controller('UserListController', { $scope: $scope });
+    $scope.$apply();
+    
+    expect(controller.users).toEqual(testUsers);
+    expect(controller.users[0].role).toBe('admin');
+  });
+});
+```
+
+#### **CSS Testing for Components**
+```javascript
+describe('Component Styling', function() {
+  it('should have correct CSS classes', function() {
+    const cssContent = loadCSS('components.css');
+    expect(cssContent).toContain('.user-card');
+    expect(cssContent).toContain('.user-card-header');
+  });
+});
+```
+
+### **📊 Comparison Matrix**
+
+| Feature | Karma Files Pattern | Jest Direct Loading | Jest Express Server | Jest Mocking |
+|---------|-------------------|-------------------|-------------------|-------------|
+| **Setup Complexity** | Medium | Low | High | Low |
+| **Performance** | Slow | Fast | Medium | Fastest |
+| **Real File Access** | Yes | Yes | Yes | No |
+| **Hot Reloading** | Yes | Manual | Manual | N/A |
+| **CI/CD Friendly** | Medium | High | Medium | High |
+| **AngularJS Integration** | Excellent | Excellent | Good | Limited |
+
+### **🎯 Recommended Approach**
+
+For **AngularJS applications**, use **Direct File Loading** because:
+
+✅ **Simple setup** - Add helpers to `jest.setup.js`  
+✅ **Fast performance** - No HTTP overhead  
+✅ **AngularJS-friendly** - Works with $templateCache  
+✅ **Flexible** - Load templates, JSON, CSS as needed  
+✅ **CI/CD optimized** - No server management required  
+
+### **📁 Directory Structure for Static Assets**
+
+```
+POC1JEST/
+├── src/
+├── templates/
+│   ├── user.html
+│   ├── user-card.html
+│   └── dashboard.html
+├── test-data/
+│   ├── users.json
+│   ├── notifications.json
+│   └── dashboard-data.json
+├── assets/
+│   ├── css/
+│   ├── images/
+│   └── fonts/
+└── __mocks__/
+    ├── fileMock.js
+    └── jsonMock.js
+```
+
+This approach provides **Karma-like static file access** with **better performance** and **simpler configuration**! 🚀
 
 ## 🎉 Conclusion
 
