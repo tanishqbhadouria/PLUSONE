@@ -1,4 +1,4 @@
-// jest.setup.js - Enhanced with Karma-like file injection
+// jest.setup.js - Enhanced with Dynamic Script Injection
 
 // 1. Add polyfills for JSDOM compatibility
 const { TextEncoder, TextDecoder } = require('util');
@@ -9,14 +9,26 @@ global.TextDecoder = TextDecoder;
 require('angular');
 require('angular-mocks');
 
-// 3. Setup JSDOM with file injection capability (optional)
-let JSDOM, FilesInjector;
-try {
-  ({ JSDOM } = require('jsdom'));
-  FilesInjector = require('./jest.files-injector');
-} catch (error) {
-  console.log('ℹ️ JSDOM not available, using basic setup');
-}
+// 3. Setup JSDOM with dynamic script injection
+const { JSDOM } = require('jsdom');
+const DynamicScriptInjector = require('./jest.dynamic-script-injector');
+
+// Create JSDOM instance
+const dom = new JSDOM('<!DOCTYPE html><html><head></head><body></body></html>', {
+  url: 'http://localhost',
+  runScripts: 'dangerously',
+  resources: 'usable',
+  pretendToBeVisual: true
+});
+
+// Make JSDOM window/document globally available
+global.window = dom.window;
+global.document = dom.window.document;
+global.navigator = dom.window.navigator;
+
+// Create dynamic script injector
+const scriptInjector = new DynamicScriptInjector(dom);
+global.scriptInjector = scriptInjector;
 
 // Create enhanced global setup
 global.setupKarmaLikeEnvironment = async function() {
@@ -32,8 +44,9 @@ global.setupKarmaLikeEnvironment = async function() {
     resources: 'usable'
   });
 
-  // Create files injector
-  const injector = new FilesInjector(dom);
+  // Create dynamic script injector
+  const DynamicScriptInjector = require('./jest.dynamic-script-injector');
+  const injector = new DynamicScriptInjector(dom);
   
   // Define Karma-like files configuration
   const karmaFiles = [
@@ -61,7 +74,7 @@ global.setupKarmaLikeEnvironment = async function() {
     global.angular = dom.window.angular;
     
     // Make injector available for individual tests
-    global.filesInjector = injector;
+    global.scriptInjector = injector;
     
     console.log('🎯 Karma-like environment ready!');
     console.log(`📁 Loaded ${results.filter(r => r.status === 'success').length} files`);
@@ -83,8 +96,8 @@ require('./src/controllers/dashboardController.js');
 
 // 4. Global test utilities (like Karma)
 global.loadScript = function(filePath) {
-  if (global.filesInjector) {
-    return global.filesInjector.injectScript(filePath);
+  if (global.scriptInjector) {
+    return global.scriptInjector.injectScriptFile(filePath);
   } else {
     // Fallback to require
     return Promise.resolve(require(filePath));
@@ -92,8 +105,8 @@ global.loadScript = function(filePath) {
 };
 
 global.isGloballyAvailable = function(functionName) {
-  if (global.filesInjector) {
-    return global.filesInjector.isGloballyAvailable(functionName);
+  if (global.scriptInjector) {
+    return typeof global.scriptInjector.window[functionName] === 'function';
   }
   return typeof global[functionName] !== 'undefined';
 };
