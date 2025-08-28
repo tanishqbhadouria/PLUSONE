@@ -19,6 +19,7 @@ This POC showcases a complete AngularJS testing setup that migrates from Karma +
 - [Setup Configuration](#setup-configuration)
 - [Testing Architecture](#testing-architecture)
 - [Key Features Demonstrated](#key-features-demonstrated)
+- [Karma-like File Injection](#karma-like-file-injection)
 - [Running Tests](#running-tests)
 - [Migration Guide](#migration-guide)
 - [Troubleshooting](#troubleshooting)
@@ -477,7 +478,52 @@ describe('Integration Tests', function() {
 - **End-to-end workflows**: User creation → notification → dashboard refresh
 - **Error propagation**: Error handling across the application
 
-## 🏃 Running Tests
+## � Karma-like File Injection
+
+This POC includes a **complete implementation** of Karma's file injection pattern using JSDOM script manipulation, making migration seamless for teams with global utility patterns.
+
+### ✅ Global Function Availability
+```javascript
+// Works without imports (like Karma!)
+describe('My Test', function() {
+  it('should use global utilities', function() {
+    expect(formatCurrency(1234.56)).toBe('$1,234.56');
+    expect(validateEmail('test@example.com')).toBe(true);
+    const user = createMockUser({ name: 'John' });
+    expect(user.name).toBe('John');
+  });
+});
+```
+
+### ✅ Files Pattern Support
+```javascript
+// Karma-like file loading configuration
+const karmaFiles = [
+  'src/utils/**/*.js',           // Global utilities
+  'src/services/**/*.js',        // Application services
+  'test/helpers/**/*.js'         // Test helpers
+];
+```
+
+### ✅ Available Global Functions
+- **Utilities**: `formatCurrency`, `validateEmail`, `generateId`, `debounce`, `throttle`, `deepClone`
+- **Mock Factories**: `createMockUser`, `createMockUsers`, `createTestNotification`
+- **DOM Helpers**: `createElement`, `findElement`, `triggerEvent`
+- **Test Helpers**: `expectToBeVisible`, `expectToHaveClass`, `createAngularTestSetup`
+
+### 📖 Complete Migration Guide
+For detailed information on how Karma's injection works and how to replicate it in Jest:
+
+**📚 [KARMA-MIGRATION-GUIDE.md](./KARMA-MIGRATION-GUIDE.md)**
+
+This comprehensive guide covers:
+- How Karma's file injection actually works
+- Key differences between Karma and Jest
+- Step-by-step migration process
+- Common pitfalls and solutions
+- Debugging migration issues
+
+## �🏃 Running Tests
 
 ### Basic Test Execution
 ```bash
@@ -575,7 +621,42 @@ it('should propagate notifications across services', function() {
 });
 ```
 
-## 🐛 Troubleshooting
+## � Documentation & Resources
+
+### Core Documentation Files
+- **📋 [README.md](./README.md)** - Main project documentation (this file)
+- **🎯 [KARMA-MIGRATION-GUIDE.md](./KARMA-MIGRATION-GUIDE.md)** - Complete Karma to Jest migration guide
+- **📊 [KARMA-INJECTION-SUMMARY.md](./KARMA-INJECTION-SUMMARY.md)** - Summary of implemented Karma-like features
+
+### Key Implementation Files
+- **⚙️ [jest.config.js](./jest.config.js)** - Jest configuration
+- **🔧 [jest.setup.js](./jest.setup.js)** - Test environment setup with global function loading
+- **🎪 [jest.files-injector.js](./jest.files-injector.js)** - JSDOM script injection system
+
+### Global Utility Demonstrations
+- **🛠️ [src/utils/helpers.js](./src/utils/helpers.js)** - Global utility functions
+- **🖥️ [src/utils/dom-helpers.js](./src/utils/dom-helpers.js)** - Global DOM manipulation utilities
+- **🧪 [test/helpers/test-utilities.js](./test/helpers/test-utilities.js)** - Global test helper functions
+- **✅ [src/karma-like-injection.spec.js](./src/karma-like-injection.spec.js)** - Working demonstration (11/11 tests passing)
+
+### Migration Quick Reference
+```javascript
+// Karma Pattern (before)
+describe('Test', function() {
+  it('works', function() {
+    expect(globalFunction()).toBe(true); // Just works!
+  });
+});
+
+// Jest with our injection (after) 
+describe('Test', function() {
+  it('works', function() {
+    expect(globalFunction()).toBe(true); // Still just works! ✅
+  });
+});
+```
+
+## �🐛 Troubleshooting
 
 ### Common Issues and Solutions
 
